@@ -1,69 +1,91 @@
-import Image from "next/image";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
-export default function Home() {
+const ERROR_MESSAGES: Record<string, string> = {
+  access_denied: "You cancelled the Google sign-in.",
+  missing_code: "Google did not return an authorization code.",
+  state_mismatch: "The sign-in request could not be verified. Please try again.",
+  not_allowed: "That Google account is not allowed to use this app.",
+  oauth_failed: "Something went wrong during sign-in. Please try again.",
+};
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const cookieStore = await cookies();
+  const session = verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-8 px-4 py-16">
+      {error ? (
+        <div className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+          {ERROR_MESSAGES[error] ?? "Sign-in failed."}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      ) : null}
+
+      <div className="w-full rounded-2xl border border-black/10 bg-white/60 p-8 shadow-sm dark:border-white/10 dark:bg-white/5">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Gmail Graduation Alerts
+        </h1>
+        <p className="mt-3 text-foreground/70">
+          Connect your school Gmail account and this app will watch for emails
+          about graduation and alert your personal inbox.
+        </p>
+
+        {session ? (
+          <div className="mt-8 space-y-4">
+            <div className="flex items-center gap-3 rounded-xl border border-black/10 bg-background px-4 py-3 dark:border-white/10">
+              {session.picture ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={session.picture}
+                  alt=""
+                  className="h-10 w-10 rounded-full"
+                />
+              ) : (
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-black/10 font-medium dark:bg-white/15">
+                  {session.email.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <div className="leading-tight">
+                <p className="text-xs uppercase tracking-wide text-foreground/50">
+                  Connected
+                </p>
+                <p className="font-medium">{session.email}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <a
+                href="/inbox"
+                className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90"
+              >
+                View your inbox
+              </a>
+              <a
+                href="/api/auth/disconnect"
+                className="text-sm text-foreground/60 underline transition hover:text-foreground"
+              >
+                Disconnect / switch account
+              </a>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-8 space-y-4">
+            <a
+              href="/api/auth/start"
+              className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90"
+            >
+              Connect your school Gmail
+            </a>
+            <p className="text-xs text-foreground/50">
+              You&apos;ll be asked to grant read and send access to Gmail.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
